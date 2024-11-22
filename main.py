@@ -8,7 +8,10 @@ from aiogram.utils import executor
 from yt_dlp import YoutubeDL
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
+
+from keyboard.default.buttons import choose_button
 from state import UserState
+from aiogram.types import ReplyKeyboardMarkup,KeyboardButton
 
 storage = MemoryStorage()
 
@@ -36,14 +39,53 @@ def clear_downloads():
 async def welcome(message: Message, state: FSMContext):
     salom = f"""
 Assalomu Aleykum @{message.from_user.username}!
-Teksti document (.txt) tashang musiqalar nomlari bor(Har bir musiqa nomi :/ boshlanishi shart !!! )
     """
     clear_downloads()
-    await message.answer(salom)
-    await UserState.send_music.set()
+    await message.answer(salom,reply_markup=choose_button)
+    await UserState.choose_button.set()
+
+    # await UserState.send_music.set()
+
+@dp.message_handler(state=UserState.choose_button)
+async def choose(message: Message, state: FSMContext):
+    user_message = message.text
+    print(user_message)
+
+    if user_message == "🔎 Musiqa nomi bilan qidirish.":
+        await message.answer("Muzikani nomini yuboring: ")
+        UserState.search_name.set()
+    elif user_message == "📝 Tekstli dokumentli orqali qidirish.":
+        await message.answer(
+            "📝 Teksti document (.txt) tashang musiqalar nomlari bor(Har bir musiqa nomi :/ boshlanishi shart !!! )")
+        UserState.search_to_txt.set()
 
 
-@dp.message_handler(content_types=types.ContentType.DOCUMENT, state=UserState.send_music)
+@dp.message_handler(state=UserState.search_name)
+async def search_music(message: Message, state: FSMContext):
+    query = message.text
+    ydl_opts = {
+        'quiet': True,
+        'format': 'bestaudio/best',
+        'noplaylist': True
+    }
+
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            search_results = ydl.extract_info(f"ytsearch:{query}", download=False)
+
+            if 'entries' in search_results and len(search_results['entries']) > 0:
+                info = search_results['entries'][0]
+                title = info['title']
+                url = info['webpage_url']
+                await message.answer(f"Topildi: {title}\nUrl: {url}")
+            else:
+                await message.answer("Musiqa topilmadi, nomini togilab koring")
+    except Exception as e:
+        logger.error(f"Ошибка: {e}")
+        await message.answer("error.")
+
+
+@dp.message_handler(content_types=types.ContentType.DOCUMENT)
 async def handle_text_file(message: types.Message, state: FSMContext):
     if message.document.mime_type == "text/plain":
         file_id = message.document.file_id
@@ -120,7 +162,7 @@ async def create_zip_archive():
 async def send_zip(message: Message, zip_path: str):
     with open(zip_path, "rb") as zip_file:
         await message.answer_document(zip_file)
-        
+
 
 
 @dp.message_handler(commands="music")
