@@ -135,8 +135,6 @@ async def search_and_download_music(message: Message, query: str):
 
                 if os.path.exists(file_path):
                     os.rename(file_path, new_file_path)
-
-                await message.answer(f"Yuklandi: {title}.mp3")
             else:
                 await message.reply(f"Musiqa topilmadi: {query}")
     except Exception as e:
