@@ -7,8 +7,10 @@ from aiogram.types import Message
 from aiogram.utils import executor
 from yt_dlp import YoutubeDL
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from state import UserState
+from aiogram.types import InputFile
+from keyboard.default.buttons import choose_button
+from config import API_TOKEN
 
 storage = MemoryStorage()
 
@@ -18,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-bot = Bot(token='7846426508:AAGyv47GaBX2p85RqCpBjaDhDvfJTAD2KRU')
+bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot,storage=storage)
 
 SAVE_FOLDER = "downloaded_music"
@@ -32,18 +34,51 @@ def clear_downloads():
             pass
         pass
 
+def download_audio(query: str) -> str:
+    save_path = "music_name_download"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": f"{save_path}/%(title)s.%(ext)s",
+        "prefer_ffmpeg": False,
+        "postprocessor_args": [],
+        "final_ext": "mp3",
+    }
+
+    with YoutubeDL(ydl_opts) as ydl:
+        result = ydl.extract_info(f"ytsearch:{query}", download=True)
+        if "entries" in result:
+            result = result["entries"][0]
+        downloaded_path = ydl.prepare_filename(result)
+        mp3_path = downloaded_path.rsplit(".", 1)[0] + ".mp3"
+        os.rename(downloaded_path, mp3_path)
+        return mp3_path
+
+
 @dp.message_handler(commands=['start'],state="*")
-async def welcome(message: Message, state: FSMContext):
-    salom = f"""
-Assalomu Aleykum @{message.from_user.username}!
-Teksti document (.txt) tashang musiqalar nomlari bor(Har bir musiqa nomi :/ boshlanishi shart !!! )
-    """
+async def start(message: types.Message):
+    await message.reply(f"Assalomu Aleykum @{message.from_user.username}!",reply_markup=choose_button)
+
+
+@dp.message_handler(text="🔎 Musiqa nomi bilan qidirish.",state="*")
+async def search_to_name(message: Message, state: FSMContext):
+    await message.answer("Muzika nomini yuboring! ")
+    await UserState.search_music_name.set()
+
+
+@dp.message_handler(text="📝 Tekstli dokumentli orqali qidirish.", state="*")
+async def txt(message: Message, state: FSMContext):
+    txt_search = f"""
+    Teksti document (.txt) tashang musiqalar nomlari bor(Har bir musiqa nomi :/ boshlanishi shart !!! )
+        """
     clear_downloads()
-    await message.answer(salom)
-    await UserState.send_music.set()
+    await message.answer(txt_search)
+    await UserState.send_music_to_txt.set()
 
 
-@dp.message_handler(content_types=types.ContentType.DOCUMENT, state=UserState.send_music)
+@dp.message_handler(content_types=types.ContentType.DOCUMENT, state=UserState.send_music_to_txt)
 async def handle_text_file(message: types.Message, state: FSMContext):
     if message.document.mime_type == "text/plain":
         file_id = message.document.file_id
@@ -123,13 +158,21 @@ async def send_zip(message: Message, zip_path: str):
         
 
 
-@dp.message_handler(commands="music")
-async def one_music(message: Message):
+@dp.message_handler(state=UserState.search_music_name)
+async def search_and_send_audio(message: types.Message):
+    query = message.text.strip()
+    await message.reply("🔍 Men musiqa qidiryapman, biroz kuting...")
+
     try:
-        with open("downloaded_music/Mr Lambo - Mango (Official Video).mp3", "rb") as audio_file:
-            await message.answer_audio(audio=audio_file)
-    except FileNotFoundError:
-        await message.answer("File Topilmadi.")
+        audio_path = download_audio(query)
+        await message.reply("🎶 Topdim! Yuborilmoqda...")
+        audio_file = InputFile(audio_path)
+        await bot.send_audio(chat_id=message.chat.id, audio=audio_file)
+        os.remove(audio_path)
+    except Exception as e:
+        await message.reply(f"❌ Musiqani topilmadi yoki yuklab boʻlmadi: {e}")
+
+
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

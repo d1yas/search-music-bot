@@ -14,7 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-bot = Bot(token='YOUR_BOT_TOKEN')
+bot = Bot(token='7846426508:AAH8JZsKshVvyOcXixsr9XazwhwKZApuggI')
 dp = Dispatcher(bot)
 
 
@@ -115,13 +115,7 @@ async def send_zip(message: Message, zip_path: str):
     with open(zip_path, "rb") as zip_file:
         await message.answer_document(zip_file)
 
-@dp.message_handler(commands="music")
-async def one_music(message: Message):
-    try:
-        with open("downloaded_music/Mr Lambo - Mango (Official Video).mp3", "rb") as audio_file:
-            await message.answer_audio(audio=audio_file)
-    except FileNotFoundError:
-        await message.answer("File Topilmadi.")
+
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
