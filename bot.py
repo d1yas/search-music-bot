@@ -71,7 +71,7 @@ async def search_to_name(message: Message, state: FSMContext):
 @dp.message_handler(text="📝 Tekstli dokumentli orqali qidirish.", state="*")
 async def txt(message: Message, state: FSMContext):
     txt_search = f"""
-    Teksti document (.txt) tashang musiqalar nomlari bor(Har bir musiqa nomi :/ boshlanishi shart !!! )
+    Teksti document (.txt) tashang musiqalar nomlari bor(Har bir musiqa nomi :/ boshlanishi shart !!! (Limit 15ta muzika bolsin) )
         """
     clear_downloads()
     await message.answer(txt_search)
